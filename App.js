@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ScrollView, Dimensions, Image, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ScrollView, Dimensions, Image, Alert, ActivityIndicator, TextInput, Platform } from 'react-native';
 
 const MAX_SELECT = 18; 
 // ★ご自身のGASのURLに置き換えてください
@@ -24,6 +24,8 @@ const RATING_IMAGES = [
 ];
 
 export default function App() {
+  const [screen, setScreen] = useState('consent');
+
   const [option1, setOption1] = useState({ source: null, type: '' });
   const [option2, setOption2] = useState({ source: null, type: '' });
   const [selectCount, setSelectCount] = useState(0);
@@ -40,15 +42,12 @@ export default function App() {
   }, []);
 
   const refreshApp = () => {
-    // 奇数画像のインデックス: 0, 2, 4... (1.png, 3.png...) -> 【高分散】として扱う
     const oddIndices = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38];
-    // 偶数画像のインデックス: 1, 3, 5... (2.png, 4.png...) -> 【低分散】として扱う
     const evenIndices = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39];
 
     const randomOddIndex = oddIndices[Math.floor(Math.random() * oddIndices.length)];
     const randomEvenIndex = evenIndices[Math.floor(Math.random() * evenIndices.length)];
 
-    // 左右どちらに配置するかをランダムに決定し、画像と属性（高分散/低分散）をセットする
     if (Math.random() > 0.5) {
       setOption1({ source: RATING_IMAGES[randomOddIndex], type: '高分散' });
       setOption2({ source: RATING_IMAGES[randomEvenIndex], type: '低分散' });
@@ -62,11 +61,10 @@ export default function App() {
   };
 
   const handleNext = () => {
-    // 選ばれたオプション（1か2）から、実際の属性（高分散か低分散）を取得する
     const chosenDistributionType = selectedOption === 1 ? option1.type : option2.type;
 
     const currentAnswer = {
-      chosenOption: chosenDistributionType, // 「1」や「2」ではなく「高分散」か「低分散」を保存
+      chosenOption: chosenDistributionType, 
       chosenCause: selectedCause
     };
     
@@ -81,9 +79,23 @@ export default function App() {
     }
   };
 
+  // アプリを初期状態にリセットして同意画面に戻る処理
+  const resetAndGoHome = () => {
+    setSelectCount(0);
+    setResults([]);
+    setEmail(''); 
+    setIsFinished(false);
+    refreshApp();
+    setScreen('consent');
+  };
+
   const submitToCloud = async () => {
     if (!email.trim()) {
-      Alert.alert("確認", "メールアドレスを入力してください。");
+      if (Platform.OS === 'web') {
+        window.alert("メールアドレスを入力してください。");
+      } else {
+        Alert.alert("確認", "メールアドレスを入力してください。");
+      }
       return;
     }
 
@@ -100,17 +112,24 @@ export default function App() {
         body: JSON.stringify(payload)
       });
 
-      Alert.alert("送信完了", "ご協力ありがとうございました！", [
-        { text: "OK", onPress: () => {
-          setSelectCount(0);
-          setResults([]);
-          setEmail(''); 
-          setIsFinished(false);
-          refreshApp();
-        }}
-      ]);
+      // ★ 送信成功時のアラート表示処理
+      if (Platform.OS === 'web') {
+        // Webの場合はwindow.alertが閉じられた直後に画面遷移を実行
+        window.alert("データは送信されました");
+        resetAndGoHome();
+      } else {
+        // スマホアプリの場合はOKボタンが押された際に画面遷移を実行
+        Alert.alert("送信完了", "データは送信されました", [
+          { text: "OK", onPress: resetAndGoHome }
+        ]);
+      }
+      
     } catch (error) {
-      Alert.alert("通信エラー", "データの送信に失敗しました。電波の良いところで再度お試しください。");
+      if (Platform.OS === 'web') {
+        window.alert("データの送信に失敗しました。電波の良いところで再度お試しください。");
+      } else {
+        Alert.alert("通信エラー", "データの送信に失敗しました。電波の良いところで再度お試しください。");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -118,10 +137,35 @@ export default function App() {
 
   const currentProduct = PRODUCTS[selectCount] || "商品";
 
+  // ==========================================
+  // ① 同意画面
+  // ==========================================
+  if (screen === 'consent') {
+    return (
+      <SafeAreaView style={styles.containerCenter}>
+        <View style={styles.cardFull}>
+          <Text style={styles.consentTitle}>アンケートご協力のお願い</Text>
+          <Text style={styles.consentText}>
+            本アンケートでは、提示された商品を購入・利用する場面を想定して、それぞれの評価画像に対する判断を行っていただきます。{'\n\n'}
+            ・全18問の設問があります。{'\n'}
+            ・直感でお答えください。{'\n'}
+            ・収集したデータは研究目的のみに使用されます。{'\n\n'}
+            上記の内容をご確認の上、同意いただける場合は「同意して開始する」を押してください。
+          </Text>
+          <TouchableOpacity style={styles.consentButton} onPress={() => setScreen('survey')}>
+            <Text style={styles.consentButtonText}>同意して開始する</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ==========================================
+  // ② アンケート本番画面（設問入力 ＆ メールアドレス入力）
+  // ==========================================
   return (
     <SafeAreaView style={styles.container}>
       {isFinished ? (
-        // ★ バグ修正：入力フォーカスが外れないよう、コンポーネントを切り出さずに直接記述
         <View style={styles.finishedContainer}>
           <Text style={styles.finishedTitle}>お疲れ様でした！</Text>
           <Text style={styles.finishedSubTitle}>{MAX_SELECT}問すべての回答が完了しました。</Text>
@@ -158,7 +202,6 @@ export default function App() {
 
           <View style={styles.cardContainer}>
             <TouchableOpacity style={[styles.card, selectedOption === 1 && styles.cardSelected]} activeOpacity={0.7} onPress={() => setSelectedOption(1)}>
-              {/* オブジェクト構造に変わったため option1.source を指定 */}
               <Image source={option1.source} style={styles.ratingImage} resizeMode="contain" />
             </TouchableOpacity>
             <View style={styles.vsContainer}><Text style={styles.vsText}>VS</Text></View>
@@ -196,7 +239,18 @@ export default function App() {
 const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
+  // 共通のコンテナスタイル
   container: { flex: 1, backgroundColor: '#f0f2f5', paddingTop: 40 },
+  containerCenter: { flex: 1, backgroundColor: '#f0f2f5', justifyContent: 'center', alignItems: 'center' },
+  
+  // 同意画面・完了画面のカードスタイル
+  cardFull: { width: '85%', maxWidth: 500, backgroundColor: 'white', padding: 30, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, alignItems: 'center' },
+  consentTitle: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 20, textAlign: 'center' },
+  consentText: { fontSize: 15, color: '#444', lineHeight: 24, marginBottom: 30 },
+  consentButton: { backgroundColor: '#007AFF', paddingVertical: 15, paddingHorizontal: 30, borderRadius: 8, width: '100%', alignItems: 'center' },
+  consentButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+
+  // アンケート画面のスタイル
   scrollContainer: { alignItems: 'center', paddingVertical: 10, paddingHorizontal: 15 },
   progressText: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', marginBottom: 15 },
   questionText: { fontSize: 16, fontWeight: 'bold', lineHeight: 24, color: '#333', width: '100%', marginBottom: 15 },
@@ -216,6 +270,7 @@ const styles = StyleSheet.create({
   nextButtonDisabled: { backgroundColor: '#A2C8F2', elevation: 0 },
   nextButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
   
+  // 終了前メールアドレス入力のスタイル
   finishedContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
   finishedTitle: { fontSize: 26, fontWeight: 'bold', color: '#333', marginBottom: 10 },
   finishedSubTitle: { fontSize: 16, color: '#666', marginBottom: 40 },
