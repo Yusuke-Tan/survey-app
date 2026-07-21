@@ -23,23 +23,26 @@ const RATING_IMAGES = [
   require('./assets/36.png'), require('./assets/37.png'), require('./assets/38.png'), require('./assets/39.png'), require('./assets/40.png'),
 ];
 
-const EC_OPTIONS = [
-  "全く利用しない",
-  "あまり利用しない",
-  "月に数回程度利用する",
-  "週に数回程度利用する",
-  "ほぼ毎日利用する"
-];
+// 選択肢の定義
+const GENDER_OPTIONS = ["男性", "女性", "その他"];
+const AGE_OPTIONS = ["10代", "20代", "30代", "40代", "50代", "60代", "70代", "80代以上"];
+const EC_OPTIONS = ["全く利用しない", "あまり利用しない", "月に数回程度利用する", "週に数回程度利用する", "ほぼ毎日利用する"];
 
 export default function App() {
+  // 画面遷移を管理 ('consent' -> 'preSurvey' -> 'survey' -> 'postSurvey' -> 'email')
   const [screen, setScreen] = useState('consent');
 
+  // 事前アンケート用のステート
+  const [gender, setGender] = useState(null);
+  const [age, setAge] = useState(null);
+
+  // アンケート本番用のステート
   const [displayImage, setDisplayImage] = useState(null);
   const [selectCount, setSelectCount] = useState(0);
   const [results, setResults] = useState([]); 
-  const [isFinished, setIsFinished] = useState(false);
   const [selectedCause, setSelectedCause] = useState(null); 
   
+  // 事後アンケート用のステート
   const [ecUsage, setEcUsage] = useState(null);
   const [feedback, setFeedback] = useState('');
 
@@ -80,6 +83,8 @@ export default function App() {
     setSelectCount(0);
     setResults([]);
     setEmail(''); 
+    setGender(null);
+    setAge(null);
     setEcUsage(null);
     setFeedback('');
     refreshApp();
@@ -100,6 +105,8 @@ export default function App() {
     try {
       const payload = {
         email: email.trim(),
+        gender: gender,     // 追加：性別
+        age: age,           // 追加：年齢
         answers: results,
         ecUsage: ecUsage,
         feedback: feedback
@@ -148,7 +155,7 @@ export default function App() {
             ・収集したデータは研究目的のみに使用されます。{'\n\n'}
             上記の内容をご確認の上、同意いただける場合は「同意して開始する」を押してください。
           </Text>
-          <TouchableOpacity style={styles.consentButton} onPress={() => setScreen('survey')}>
+          <TouchableOpacity style={styles.consentButton} onPress={() => setScreen('preSurvey')}>
             <Text style={styles.consentButtonText}>同意して開始する</Text>
           </TouchableOpacity>
         </View>
@@ -157,7 +164,55 @@ export default function App() {
   }
 
   // ==========================================
-  // ② 事後アンケート
+  // ② 事前アンケート画面
+  // ==========================================
+  if (screen === 'preSurvey') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <Text style={styles.finishedTitle}>事前アンケート</Text>
+          <Text style={styles.finishedSubTitle}>はじめにご自身の属性について教えてください。</Text>
+
+          <View style={styles.sectionContainer}>
+            <Text style={styles.questionText}>1. 性別</Text>
+            <View style={styles.rowContainer}>
+              {GENDER_OPTIONS.map((opt, idx) => (
+                <TouchableOpacity 
+                  key={idx} 
+                  style={[styles.thirdOptionButton, gender === opt && styles.optionButtonSelected]} 
+                  onPress={() => setGender(opt)}
+                >
+                  <Text style={[styles.optionButtonText, gender === opt && styles.optionButtonTextSelected]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.sectionContainer}>
+            <Text style={styles.questionText}>2. 年齢</Text>
+            <View style={styles.rowContainer}>
+              {AGE_OPTIONS.map((opt, idx) => (
+                <TouchableOpacity 
+                  key={idx} 
+                  style={[styles.halfOptionButton, age === opt && styles.optionButtonSelected]} 
+                  onPress={() => setAge(opt)}
+                >
+                  <Text style={[styles.optionButtonText, age === opt && styles.optionButtonTextSelected]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <TouchableOpacity style={[styles.nextButton, (!gender || !age) && styles.nextButtonDisabled]} onPress={() => setScreen('survey')} disabled={!gender || !age}>
+            <Text style={styles.nextButtonText}>次へ</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ==========================================
+  // ③ 事後アンケート画面
   // ==========================================
   if (screen === 'postSurvey') {
     return (
@@ -165,18 +220,21 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <Text style={styles.finishedTitle}>事後アンケート</Text>
           <Text style={styles.finishedSubTitle}>ご回答お疲れ様でした。最後に以下の質問にお答えください。</Text>
-          <View style={styles.postSurveySection}>
-            <Text style={styles.questionText}>1. ECサイトの使用頻度</Text>
+          
+          <View style={styles.sectionContainer}>
+            <Text style={styles.questionText}>1. ECサイト（Amazon、楽天など）の使用頻度を教えてください。</Text>
             {EC_OPTIONS.map((option, idx) => (
               <TouchableOpacity key={idx} style={[styles.optionButton, ecUsage === option && styles.optionButtonSelected]} onPress={() => setEcUsage(option)}>
                 <Text style={[styles.optionButtonText, ecUsage === option && styles.optionButtonTextSelected]}>{option}</Text>
               </TouchableOpacity>
             ))}
           </View>
-          <View style={styles.postSurveySection}>
-            <Text style={styles.questionText}>2. 感想をご記入ください。</Text>
-            <TextInput style={styles.textArea} multiline numberOfLines={4} value={feedback} onChangeText={setFeedback} />
+          
+          <View style={styles.sectionContainer}>
+            <Text style={styles.questionText}>2. 本アンケート実験の感想をご自由にご記入ください。</Text>
+            <TextInput style={styles.textArea} multiline numberOfLines={4} placeholder="感想はこちらにご記入ください（任意）" value={feedback} onChangeText={setFeedback} />
           </View>
+          
           <TouchableOpacity style={[styles.nextButton, !ecUsage && styles.nextButtonDisabled]} onPress={() => setScreen('email')} disabled={!ecUsage}>
             <Text style={styles.nextButtonText}>次へ</Text>
           </TouchableOpacity>
@@ -186,14 +244,15 @@ export default function App() {
   }
 
   // ==========================================
-  // ③ メール入力
+  // ④ メール入力画面
   // ==========================================
   if (screen === 'email') {
     return (
       <SafeAreaView style={styles.containerCenter}>
         <View style={styles.finishedContainer}>
           <Text style={styles.finishedTitle}>最後のステップ</Text>
-          <TextInput style={styles.emailInput} placeholder="example@mail.com" keyboardType="email-address" value={email} onChangeText={setEmail} />
+          <Text style={styles.finishedSubTitle}>報酬のお支払い等に必要なメールアドレスをご入力ください。</Text>
+          <TextInput style={styles.emailInput} placeholder="example@mail.com" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
           <TouchableOpacity style={styles.submitButton} onPress={submitToCloud} disabled={isSubmitting}>
             {isSubmitting ? <ActivityIndicator color="white" /> : <Text style={styles.submitButtonText}>回答を送信して終了する</Text>}
           </TouchableOpacity>
@@ -203,7 +262,7 @@ export default function App() {
   }
 
   // ==========================================
-  // ④ アンケート本番
+  // ⑤ アンケート本番画面
   // ==========================================
   return (
     <SafeAreaView style={styles.container}>
@@ -243,26 +302,38 @@ const styles = StyleSheet.create({
   consentText: { fontSize: 15, marginBottom: 30 },
   consentButton: { backgroundColor: '#007AFF', padding: 15, borderRadius: 8, width: '100%', alignItems: 'center' },
   consentButtonText: { color: 'white', fontWeight: 'bold' },
-  singleCard: { width: width * 0.8, aspectRatio: 1.5, backgroundColor: 'white', padding: 10, borderRadius: 12, elevation: 3, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
+  
+  // アンケート共通
+  questionText: { fontSize: 16, fontWeight: 'bold', marginBottom: 20, alignSelf: 'flex-start' },
+  nextButton: { backgroundColor: '#007AFF', width: '100%', maxWidth: 500, padding: 16, borderRadius: 30, alignItems: 'center', marginTop: 20 },
+  nextButtonDisabled: { backgroundColor: '#A2C8F2' },
+  nextButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+
+  // 本番用
+  progressText: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', marginBottom: 15 },
+  singleCard: { width: width * 0.8, maxWidth: 400, aspectRatio: 1.5, backgroundColor: 'white', padding: 10, borderRadius: 12, elevation: 3, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
   ratingImage: { width: '100%', height: '100%' },
-  questionText: { fontSize: 16, fontWeight: 'bold', marginBottom: 20 },
-  causeContainer: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 30 },
+  causeContainer: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', maxWidth: 500, marginBottom: 30 },
   causeButton: { flex: 1, backgroundColor: 'white', padding: 15, marginHorizontal: 5, borderRadius: 8, borderWidth: 2, borderColor: '#ddd', alignItems: 'center' },
   causeButtonSelected: { borderColor: '#007AFF', backgroundColor: '#f0f8ff' },
   causeButtonText: { fontSize: 15, fontWeight: 'bold' },
   causeButtonTextSelected: { color: '#007AFF' },
-  nextButton: { backgroundColor: '#007AFF', width: '90%', padding: 16, borderRadius: 30, alignItems: 'center' },
-  nextButtonDisabled: { backgroundColor: '#A2C8F2' },
-  nextButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  postSurveySection: { width: '100%', marginBottom: 30 },
-  optionButton: { padding: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10 },
+
+  // 事前・事後アンケート共通
+  sectionContainer: { width: '100%', maxWidth: 500, marginBottom: 30 },
+  rowContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', width: '100%' },
+  thirdOptionButton: { width: '31%', paddingVertical: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10, alignItems: 'center' },
+  halfOptionButton: { width: '48%', paddingVertical: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10, alignItems: 'center' },
+  optionButton: { padding: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10, width: '100%' },
   optionButtonSelected: { borderColor: '#007AFF', backgroundColor: '#f0f8ff' },
-  optionButtonText: { fontSize: 16 },
+  optionButtonText: { fontSize: 15, fontWeight: 'bold', color: '#555' },
   optionButtonTextSelected: { color: '#007AFF' },
-  textArea: { width: '100%', backgroundColor: 'white', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 15, fontSize: 16, height: 100 },
+  textArea: { width: '100%', backgroundColor: 'white', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 15, fontSize: 16, minHeight: 100, textAlignVertical: 'top' },
+
+  // 終了前メールアドレス入力
   finishedContainer: { width: '85%', maxWidth: 500, alignItems: 'center' },
   finishedTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  finishedSubTitle: { fontSize: 16, marginBottom: 30 },
+  finishedSubTitle: { fontSize: 16, marginBottom: 30, textAlign: 'center' },
   emailInput: { width: '100%', backgroundColor: 'white', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 15, marginBottom: 30 },
   submitButton: { backgroundColor: '#28a745', padding: 15, borderRadius: 25, width: '100%', alignItems: 'center' },
   submitButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
