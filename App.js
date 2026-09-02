@@ -28,21 +28,25 @@ const GENDER_OPTIONS = ["男性", "女性", "その他"];
 const AGE_OPTIONS = ["10代", "20代", "30代", "40代", "50代", "60代", "70代", "80代以上"];
 const EC_OPTIONS = ["全く利用しない", "あまり利用しない", "月に数回程度利用する", "週に数回程度利用する", "ほぼ毎日利用する"];
 
+const CAUSE_OPTIONS = [
+  "商品が原因",
+  "たぶん商品が原因",
+  "どちらともいえない",
+  "たぶんレビュワーが原因",
+  "レビュワーが原因"
+];
+
 export default function App() {
-  // 画面遷移を管理 ('consent' -> 'preSurvey' -> 'survey' -> 'postSurvey' -> 'email')
   const [screen, setScreen] = useState('consent');
 
-  // 事前アンケート用のステート
   const [gender, setGender] = useState(null);
   const [age, setAge] = useState(null);
 
-  // アンケート本番用のステート
   const [displayImage, setDisplayImage] = useState(null);
   const [selectCount, setSelectCount] = useState(0);
   const [results, setResults] = useState([]); 
   const [selectedCause, setSelectedCause] = useState(null); 
   
-  // 事後アンケート用のステート
   const [ecUsage, setEcUsage] = useState(null);
   const [feedback, setFeedback] = useState('');
 
@@ -54,7 +58,6 @@ export default function App() {
   }, []);
 
   const refreshApp = () => {
-    // 高分散の評価画像のみを抽出 (奇数インデックス: 0, 2, 4...)
     const oddIndices = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38];
     const randomOddIndex = oddIndices[Math.floor(Math.random() * oddIndices.length)];
     
@@ -105,8 +108,8 @@ export default function App() {
     try {
       const payload = {
         email: email.trim(),
-        gender: gender,     // 追加：性別
-        age: age,           // 追加：年齢
+        gender: gender,
+        age: age,
         answers: results,
         ecUsage: ecUsage,
         feedback: feedback
@@ -268,19 +271,25 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Text style={styles.progressText}>Q{selectCount + 1} / {MAX_SELECT}</Text>
-        <Text style={styles.questionText}>「{currentProduct}」の低評価（★1、2）の原因は、主にどちらにあると感じますか？</Text>
+        <Text style={styles.questionText}>「{currentProduct}」の低評価（★1、2）の原因は、主にどこにあると感じますか？</Text>
         
         <View style={styles.singleCard}>
           <Image source={displayImage} style={styles.ratingImage} resizeMode="contain" />
         </View>
 
-        <View style={styles.causeContainer}>
-          <TouchableOpacity style={[styles.causeButton, selectedCause === 'product' && styles.causeButtonSelected]} onPress={() => setSelectedCause('product')}>
-            <Text style={[styles.causeButtonText, selectedCause === 'product' && styles.causeButtonTextSelected]}>商品・サービス</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.causeButton, selectedCause === 'reviewer' && styles.causeButtonSelected]} onPress={() => setSelectedCause('reviewer')}>
-            <Text style={[styles.causeButtonText, selectedCause === 'reviewer' && styles.causeButtonTextSelected]}>レビュワー</Text>
-          </TouchableOpacity>
+        {/* ★ 5段階評価のボタンを横並びに変更 */}
+        <View style={styles.scaleContainer}>
+          {CAUSE_OPTIONS.map((option, idx) => (
+            <TouchableOpacity 
+              key={idx} 
+              style={[styles.scaleButton, selectedCause === option && styles.scaleButtonSelected]} 
+              onPress={() => setSelectedCause(option)}
+            >
+              <Text style={[styles.scaleButtonText, selectedCause === option && styles.scaleButtonTextSelected]}>
+                {option}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <TouchableOpacity style={[styles.nextButton, !selectedCause && styles.nextButtonDisabled]} onPress={handleNext} disabled={!selectedCause}>
@@ -305,7 +314,7 @@ const styles = StyleSheet.create({
   
   // アンケート共通
   questionText: { fontSize: 16, fontWeight: 'bold', marginBottom: 20, alignSelf: 'flex-start' },
-  nextButton: { backgroundColor: '#007AFF', width: '100%', maxWidth: 500, padding: 16, borderRadius: 30, alignItems: 'center', marginTop: 20 },
+  nextButton: { backgroundColor: '#007AFF', width: '100%', maxWidth: 500, padding: 16, borderRadius: 30, alignItems: 'center', marginTop: 20, marginBottom: 40 },
   nextButtonDisabled: { backgroundColor: '#A2C8F2' },
   nextButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 
@@ -313,18 +322,49 @@ const styles = StyleSheet.create({
   progressText: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', marginBottom: 15 },
   singleCard: { width: width * 0.8, maxWidth: 400, aspectRatio: 1.5, backgroundColor: 'white', padding: 10, borderRadius: 12, elevation: 3, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
   ratingImage: { width: '100%', height: '100%' },
-  causeContainer: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', maxWidth: 500, marginBottom: 30 },
-  causeButton: { flex: 1, backgroundColor: 'white', padding: 15, marginHorizontal: 5, borderRadius: 8, borderWidth: 2, borderColor: '#ddd', alignItems: 'center' },
-  causeButtonSelected: { borderColor: '#007AFF', backgroundColor: '#f0f8ff' },
-  causeButtonText: { fontSize: 15, fontWeight: 'bold' },
-  causeButtonTextSelected: { color: '#007AFF' },
 
-  // 事前・事後アンケート共通
+  // ★ 5段階評価の横並び用スタイル
+  scaleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'stretch', // 高さを均等に揃える
+    width: '100%',
+    maxWidth: 600,
+    marginBottom: 30,
+  },
+  scaleButton: {
+    flex: 1, // 均等に幅を割り振る
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginHorizontal: 3, // ボタン同士の隙間
+    paddingVertical: 10,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scaleButtonSelected: {
+    borderColor: '#007AFF',
+    backgroundColor: '#f0f8ff',
+    borderWidth: 2,
+  },
+  scaleButtonText: {
+    fontSize: 12, // スマホでも収まるように少し小さめ
+    fontWeight: 'bold',
+    color: '#555',
+    textAlign: 'center',
+  },
+  scaleButtonTextSelected: {
+    color: '#007AFF',
+  },
+
+  // 事前・事後アンケート共通の選択肢ボタン
   sectionContainer: { width: '100%', maxWidth: 500, marginBottom: 30 },
   rowContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', width: '100%' },
   thirdOptionButton: { width: '31%', paddingVertical: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10, alignItems: 'center' },
   halfOptionButton: { width: '48%', paddingVertical: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10, alignItems: 'center' },
-  optionButton: { padding: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10, width: '100%' },
+  optionButton: { padding: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10, width: '100%', alignItems: 'center' },
   optionButtonSelected: { borderColor: '#007AFF', backgroundColor: '#f0f8ff' },
   optionButtonText: { fontSize: 15, fontWeight: 'bold', color: '#555' },
   optionButtonTextSelected: { color: '#007AFF' },
